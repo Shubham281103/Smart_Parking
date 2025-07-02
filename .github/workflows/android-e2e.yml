@@ -102,18 +102,18 @@ jobs:
       # Create and start emulator
       - name: Create and start emulator
         run: |
-          echo "Installing platform-tools and system image..."
-          echo "y" | sdkmanager "platform-tools" "system-images;android-30;google_apis;x86_64"
+          echo "Installing platform-tools, emulator, and system image..."
+          echo "y" | sdkmanager --install "platform-tools" "emulator" "system-images;android-30;google_apis;x86_64"
 
           echo "Creating AVD..."
           echo "no" | avdmanager create avd -n $EMULATOR_NAME -k "system-images;android-30;google_apis;x86_64" --device "pixel"
 
           echo "Starting emulator..."
-          nohup emulator -avd $EMULATOR_NAME -no-audio -no-boot-anim -no-window -gpu swiftshader_indirect &
+          nohup $ANDROID_SDK_ROOT/emulator/emulator -avd $EMULATOR_NAME -no-audio -no-boot-anim -no-window -gpu swiftshader_indirect &
 
           echo "Waiting for emulator to boot..."
-          adb wait-for-device
-          adb shell 'while [[ -z $(getprop sys.boot_completed) ]]; do sleep 1; done;'
+          $ANDROID_SDK_ROOT/platform-tools/adb wait-for-device
+          $ANDROID_SDK_ROOT/platform-tools/adb shell 'while [[ -z $(getprop sys.boot_completed) ]]; do sleep 1; done;'
 
        # Inject Google Maps API Key
       - name: Inject Google Maps API Key
