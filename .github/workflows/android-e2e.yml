@@ -100,7 +100,7 @@ jobs:
         run: ls -l $ANDROID_HOME/cmdline-tools
 
       # Start Android Emulator using ReactiveCircus/android-emulator-runner
-      - name: Start Android Emulator
+      - name: Run E2E tests on emulator
         uses: ReactiveCircus/android-emulator-runner@v2
         with:
           api-level: 30
@@ -108,6 +108,13 @@ jobs:
           arch: x86_64
           profile: pixel
           emulator-options: -no-window -no-audio -no-boot-anim
+          script: |
+            ./gradlew assembleDebug -p Vision-Parking/app
+            $ANDROID_HOME/platform-tools/adb install -r Vision-Parking/app/build/outputs/apk/debug/app-debug.apk
+            npm install -g appium
+            nohup appium --log appium.log &
+            sleep 10
+            pytest --maxfail=1 --disable-warnings --html=report.html --self-contained-html -p Vision-Parking/tests
 
       # Inject Google Maps API Key
       - name: Inject Google Maps API Key
