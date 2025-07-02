@@ -50,7 +50,7 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y docker-compose
 
-      # Clean up Docker Compose
+      # Clean up Docker Compose (remove old containers and volumes)
       - name: Clean up Docker Compose
         run: docker-compose down -v
         working-directory: ./Backend
@@ -77,7 +77,7 @@ jobs:
 
       # --- Database migration steps ---
       - name: Initialize DB migration environment (if needed)
-        run: docker-compose exec app flask db init || true
+        run: docker-compose exec -T app flask db init || true
         working-directory: ./Backend
 
       - name: Generate migration scripts
@@ -85,7 +85,7 @@ jobs:
         working-directory: ./Backend
 
       - name: Apply migrations to database
-        run: docker-compose exec app flask db upgrade
+        run: docker-compose exec -T app flask db upgrade
         working-directory: ./Backend
 
       # Create and start emulator
