@@ -1,0 +1,130 @@
+name: Android E2E Tests with Backend
+
+on:
+  push:
+    branches: [ main, master ]
+  pull_request:
+    branches: [ main, master ]
+  workflow_dispatch:
+
+jobs:
+  e2e-tests:
+    runs-on: ubuntu-latest
+
+    env:
+      ANDROID_SDK_ROOT: /opt/android-sdk
+      API_LEVEL: 30
+      EMULATOR_NAME: test-emulator
+
+    steps:
+      # Checkout code
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      # Set up JDK 11
+      - name: Set up JDK 11
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: 11
+
+      # Set up Python
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      # Install Python dependencies
+      - name: Install Python dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r Vision-Parking/tests/requirements.txt
+
+      # Set up Android SDK
+      - name: Set up Android SDK
+        uses: android-actions/setup-android@v3
+
+      # Start backend with Docker Compose
+      - name: Start backend with Docker Compose
+        run: docker-compose up -d
+        working-directory: ./Backend
+
+      # Wait for backend to be ready
+      - name: Wait for backend to be ready
+        run: |
+          for i in {1..30}; do
+            if curl -s http://localhost:8000/health; then
+              echo "Backend is up!"
+              exit 0
+            fi
+            echo "Waiting for backend..."
+            sleep 5
+          done
+          echo "Backend did not start in time"
+          exit 1
+        working-directory: ./Backend
+
+      # --- Database migration steps ---
+      - name: Initialize DB migration environment (if needed)
+        run: docker-compose exec app flask db init || true
+        working-directory: ./Backend
+
+      - name: Generate migration scripts
+        run: docker-compose exec app flask db migrate -m "Initial migration"
+        working-directory: ./Backend
+
+      - name: Apply migrations to database
+        run: docker-compose exec app flask db upgrade
+        working-directory: ./Backend
+
+      # Create and start emulator
+      - name: Create and start emulator
+        run: |
+          echo "y" | $ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager --install 'system-images;android-30;google_apis;x86_64'
+          $ANDROID_HOME/cmdline-tools/latest/bin/avdmanager create avd -n $EMULATOR_NAME -k 'system-images;android-30;google_apis;x86_64' --force
+          nohup $ANDROID_HOME/emulator/emulator -avd $EMULATOR_NAME -no-window -no-audio -no-boot-anim -gpu swiftshader_indirect &
+          $ANDROID_HOME/platform-tools/adb wait-for-device
+          $ANDROID_HOME/platform-tools/adb shell 'while [[ -z $(getprop sys.boot_completed) ]]; do sleep 1; done;'
+
+
+       # Inject Google Maps API Key
+      - name: Inject Google Maps API Key
+        run: echo "MAPS_API_KEY=${{ secrets.MAPS_API_KEY }}" >> Vision-Parking/local.properties
+      
+      
+      # Build Android app
+      - name: Build Android app
+        run: ./gradlew assembleDebug
+        working-directory: Vision-Parking/app
+
+      # Install APK on emulator
+      - name: Install APK on emulator
+        run: |
+          $ANDROID_HOME/platform-tools/adb install -r Vision-Parking/app/build/outputs/apk/debug/app-debug.apk
+
+      # Start Appium server
+      - name: Start Appium server
+        run: |
+          npm install -g appium
+          nohup appium --log appium.log &
+          sleep 10
+
+      # Run E2E tests
+      - name: Run E2E tests
+        run: |
+          pytest --maxfail=1 --disable-warnings --html=report.html --self-contained-html
+        working-directory: Vision-Parking/tests
+
+      # Upload test report
+      - name: Upload test report
+        uses: actions/upload-artifact@v4
+        with:
+          name: e2e-test-report
+          path: Vision-Parking/tests/report.html
+
+      # Upload Appium log
+      - name: Upload Appium log
+        uses: actions/upload-artifact@v4
+        with:
+          name: appium-log
+          path: appium.log 
