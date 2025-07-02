@@ -113,6 +113,10 @@ jobs:
         # Overwriting with `>` is fine if `local.properties` is generated.
         # If it's meant to append, use `>>`.
 
+      # Debug: List Vision-Parking directory contents
+      - name: List Vision-Parking directory contents
+        run: ls -l Vision-Parking
+
       # Make gradlew executable (required for Linux CI)
       - name: Make gradlew executable
         run: chmod +x Vision-Parking/gradlew
@@ -193,6 +197,4 @@ jobs:
 
       # Stop Docker Compose (Crucial for clean up and resource management)
       - name: Stop Docker Compose Backend
-        run: docker compose down -v # Use `docker compose` (v2 syntax)
-        working-directory: ./Backend
-        if: always() # Ensure this runs to clean up resources
+        run: docker compose down -v # Use `docker compose`
