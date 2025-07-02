@@ -116,9 +116,11 @@ jobs:
           avdmanager list avd
 
           echo "Starting emulator..."
+          export ANDROID_AVD_HOME=/home/runner/.config/.android/avd
           nohup $ANDROID_SDK_ROOT/emulator/emulator -avd $EMULATOR_NAME -no-audio -no-boot-anim -no-window -gpu swiftshader_indirect &
 
           echo "Waiting for emulator to boot..."
+          export ANDROID_AVD_HOME=/home/runner/.config/.android/avd
           $ANDROID_SDK_ROOT/platform-tools/adb wait-for-device
           $ANDROID_SDK_ROOT/platform-tools/adb shell 'while [[ -z $(getprop sys.boot_completed) ]]; do sleep 1; done;'
 
