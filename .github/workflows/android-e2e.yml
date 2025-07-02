@@ -121,16 +121,55 @@ jobs:
           target: google_apis
           arch: x86_64
           profile: Nexus 5
-          # Hardware acceleration (KVM) is NOT available on GitHub-hosted runners, so the emulator will run in software mode.
           emulator-options: -no-window -no-audio -no-boot-anim -no-snapshot -memory 2048
           script: |
-            cd Vision-Parking
-            ./gradlew assembleDebug -p app
-            $ANDROID_SDK_ROOT/platform-tools/adb install -r app/build/outputs/apk/debug/app-debug.apk
-            npm install -g appium
+            cd Vision-Parking || { echo "Failed to change directory to Vision-Parking"; exit 1; }
+
+            echo "Assembling debug APK..."
+            ./gradlew assembleDebug -p app || { echo "Gradle build failed"; exit 1; }
+
+            echo "Waiting for Android device..."
+            ${ANDROID_SDK_ROOT}/platform-tools/adb wait-for-device
+
+            echo "Polling for emulator boot completion..."
+            for i in $(seq 1 30); do
+              BOOT_STATUS=$(${ANDROID_SDK_ROOT}/platform-tools/adb shell getprop sys.boot_completed | tr -d '\r');
+              if [[ "$BOOT_STATUS" == "1" ]]; then
+                echo "✅ Emulator boot completed";
+                break;
+              fi;
+              echo "⏳ Waiting for emulator to boot ($i/30)...";
+              sleep 5;
+            done
+            if [[ "$BOOT_STATUS" != "1" ]]; then
+              echo "❌ Emulator did not boot in time.";
+              exit 1;
+            fi
+
+            echo "Attempting adb root..."
+            ${ANDROID_SDK_ROOT}/platform-tools/adb root || echo "⚠️ adb root failed (may not be necessary)"
+            sleep 2
+
+            echo "Attempting adb remount..."
+            ${ANDROID_SDK_ROOT}/platform-tools/adb remount || echo "⚠️ adb remount failed (may not be necessary)"
+
+            echo "Disabling animations for faster tests..."
+            ${ANDROID_SDK_ROOT}/platform-tools/adb shell settings put global window_animation_scale 0.0 || echo "⚠️ Failed to set window animation scale"
+            ${ANDROID_SDK_ROOT}/platform-tools/adb shell settings put global transition_animation_scale 0.0 || echo "⚠️ Failed to set transition animation scale"
+            ${ANDROID_SDK_ROOT}/platform-tools/adb shell settings put global animator_duration_scale 0.0 || echo "⚠️ Failed to set animator duration scale"
+
+            echo "Installing app-debug.apk..."
+            ${ANDROID_SDK_ROOT}/platform-tools/adb install -r app/build/outputs/apk/debug/app-debug.apk || { echo "App installation failed"; exit 1; }
+
+            echo "Installing Appium globally..."
+            npm install -g appium || { echo "Appium installation failed"; exit 1; }
+
+            echo "Starting Appium server in background..."
             nohup appium --log ${{ env.APPIUM_LOG_FILE }} &
             sleep 15
-            pytest --maxfail=1 --disable-warnings --html=${{ env.TEST_REPORT_FILE }} --self-contained-html
+
+            echo "Running pytest E2E tests..."
+            pytest --maxfail=1 --disable-warnings --html=${{ env.TEST_REPORT_FILE }} --self-contained-html || { echo "E2E tests failed"; exit 1; }
 
       # Upload test report (Use defined env var for path)
       - name: Upload test report
