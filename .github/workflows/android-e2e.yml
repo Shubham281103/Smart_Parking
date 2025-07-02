@@ -43,6 +43,8 @@ jobs:
       # Set up Android SDK
       - name: Set up Android SDK
         uses: android-actions/setup-android@v3
+        with:
+          packages: 'system-images;android-30;google_apis;x86_64'
 
       # Install Docker Compose
       - name: Install Docker Compose
