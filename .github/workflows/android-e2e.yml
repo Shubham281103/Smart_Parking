@@ -95,14 +95,17 @@ jobs:
         run: docker-compose exec -T app flask db upgrade
         working-directory: ./Backend
 
+      # Debug Android cmdline-tools
+      - name: Debug Android cmdline-tools
+        run: ls -l $ANDROID_HOME/cmdline-tools
+
       # Create and start emulator
       - name: Create and start emulator
         run: |
-          $ANDROID_HOME/cmdline-tools/latest/bin/avdmanager create avd -n $EMULATOR_NAME -k 'system-images;android-30;google_apis;x86_64' --force
+          avdmanager create avd -n $EMULATOR_NAME -k 'system-images;android-30;google_apis;x86_64' --force
           nohup $ANDROID_HOME/emulator/emulator -avd $EMULATOR_NAME -no-window -no-audio -no-boot-anim -gpu swiftshader_indirect &
           $ANDROID_HOME/platform-tools/adb wait-for-device
           $ANDROID_HOME/platform-tools/adb shell 'while [[ -z $(getprop sys.boot_completed) ]]; do sleep 1; done;'
-        working-directory: ./Backend
 
        # Inject Google Maps API Key
       - name: Inject Google Maps API Key
