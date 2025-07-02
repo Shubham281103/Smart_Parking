@@ -76,7 +76,7 @@ jobs:
         working-directory: ./Backend
 
       - name: Generate migration scripts
-        run: docker-compose exec app flask db migrate -m "Initial migration"
+        run: docker-compose exec -T app flask db migrate -m "Initial migration"
         working-directory: ./Backend
 
       - name: Apply migrations to database
