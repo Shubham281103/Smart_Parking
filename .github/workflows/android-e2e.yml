@@ -105,8 +105,15 @@ jobs:
           echo "Installing platform-tools, emulator, and system image..."
           echo "y" | sdkmanager --install "platform-tools" "emulator" "system-images;android-30;google_apis;x86_64"
 
+          echo "Ensuring AVD directory exists..."
+          mkdir -p $HOME/.android/avd
+
           echo "Creating AVD..."
           echo "no" | avdmanager create avd -n $EMULATOR_NAME -k "system-images;android-30;google_apis;x86_64" --device "pixel"
+
+          echo "Listing AVDs..."
+          ls -l $HOME/.android/avd || true
+          avdmanager list avd
 
           echo "Starting emulator..."
           nohup $ANDROID_SDK_ROOT/emulator/emulator -avd $EMULATOR_NAME -no-audio -no-boot-anim -no-window -gpu swiftshader_indirect &
