@@ -116,16 +116,25 @@ jobs:
             {
               cd Vision-Parking
               ./gradlew assembleDebug -p app
+
               $ANDROID_HOME/platform-tools/adb wait-for-device
               for i in {1..30}; do
                 BOOT_STATUS=$($ANDROID_HOME/platform-tools/adb shell getprop sys.boot_completed | tr -d '\r')
                 if [[ "$BOOT_STATUS" == "1" ]]; then
-                  echo "Emulator booted!"
+                  echo "✅ Emulator boot completed"
                   break
                 fi
-                echo "Waiting for emulator to boot..."
+                echo "⏳ Waiting for emulator to boot..."
                 sleep 5
               done
+
+              $ANDROID_HOME/platform-tools/adb root || echo "⚠️ adb root failed"
+              sleep 2
+              $ANDROID_HOME/platform-tools/adb remount || echo "⚠️ adb remount failed"
+              $ANDROID_HOME/platform-tools/adb shell settings put global window_animation_scale 0.0 || echo "⚠️ Failed to set window animation scale"
+              $ANDROID_HOME/platform-tools/adb shell settings put global transition_animation_scale 0.0 || echo "⚠️ Failed to set transition animation scale"
+              $ANDROID_HOME/platform-tools/adb shell settings put global animator_duration_scale 0.0 || echo "⚠️ Failed to set animator duration scale"
+
               $ANDROID_HOME/platform-tools/adb install -r app/build/outputs/apk/debug/app-debug.apk
               npm install -g appium
               nohup appium --log appium.log &
