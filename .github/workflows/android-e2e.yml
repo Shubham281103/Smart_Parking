@@ -114,12 +114,12 @@ jobs:
           emulator-options: -no-window -no-audio -no-boot-anim -no-snapshot
           boot-timeout: 600
           script: |
-            cd Vision-Parking
-            ./gradlew assembleDebug -p app
-            $ANDROID_HOME/platform-tools/adb install -r app/build/outputs/apk/debug/app-debug.apk
-            npm install -g appium
-            nohup appium --log appium.log &
-            sleep 10
+            cd Vision-Parking && \
+            ./gradlew assembleDebug -p app && \
+            $ANDROID_HOME/platform-tools/adb install -r app/build/outputs/apk/debug/app-debug.apk && \
+            npm install -g appium && \
+            nohup appium --log appium.log & \
+            sleep 10 && \
             pytest --maxfail=1 --disable-warnings --html=report.html --self-contained-html -p tests
 
       # Upload test report
