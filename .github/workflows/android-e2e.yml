@@ -62,10 +62,6 @@ jobs:
           # Set Android SDK root to a more typical location
           android-sdk-path: ${{ env.ANDROID_SDK_ROOT }}
 
-      # Install Docker Compose (Modern approach using Docker's official way)
-      - name: Install Docker (for Docker Compose)
-        uses: docker/setup-docker@v3 # Use a dedicated action for Docker setup
-
       # Docker Compose Cleanup (Ensure it's always run, even on failure)
       - name: Clean up Docker Compose (remove old containers and volumes)
         run: docker compose down -v # Use `docker compose` (v2 syntax)
