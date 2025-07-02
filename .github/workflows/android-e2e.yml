@@ -99,15 +99,20 @@ jobs:
       - name: Debug Android cmdline-tools
         run: ls -l $ANDROID_HOME/cmdline-tools
 
-      # Start Android Emulator using ReactiveCircus/android-emulator-runner
+      # Inject Google Maps API Key (before build)
+      - name: Inject Google Maps API Key
+        run: echo "MAPS_API_KEY=${{ secrets.MAPS_API_KEY }}" >> Vision-Parking/local.properties
+
+      # Run E2E tests on emulator
       - name: Run E2E tests on emulator
         uses: ReactiveCircus/android-emulator-runner@v2
         with:
-          api-level: 30
+          api-level: 29
           target: google_apis
           arch: x86_64
-          profile: pixel
-          emulator-options: -no-window -no-audio -no-boot-anim
+          profile: Nexus 5
+          emulator-options: -no-window -no-audio -no-boot-anim -no-snapshot
+          boot-timeout: 600
           script: |
             ./gradlew assembleDebug -p Vision-Parking/app
             $ANDROID_HOME/platform-tools/adb install -r Vision-Parking/app/build/outputs/apk/debug/app-debug.apk
@@ -115,34 +120,6 @@ jobs:
             nohup appium --log appium.log &
             sleep 10
             pytest --maxfail=1 --disable-warnings --html=report.html --self-contained-html -p Vision-Parking/tests
-
-      # Inject Google Maps API Key
-      - name: Inject Google Maps API Key
-        run: echo "MAPS_API_KEY=${{ secrets.MAPS_API_KEY }}" >> Vision-Parking/local.properties
-      
-      
-      # Build Android app
-      - name: Build Android app
-        run: ./gradlew assembleDebug
-        working-directory: Vision-Parking/app
-
-      # Install APK on emulator
-      - name: Install APK on emulator
-        run: |
-          $ANDROID_HOME/platform-tools/adb install -r Vision-Parking/app/build/outputs/apk/debug/app-debug.apk
-
-      # Start Appium server
-      - name: Start Appium server
-        run: |
-          npm install -g appium
-          nohup appium --log appium.log &
-          sleep 10
-
-      # Run E2E tests
-      - name: Run E2E tests
-        run: |
-          pytest --maxfail=1 --disable-warnings --html=report.html --self-contained-html
-        working-directory: Vision-Parking/tests
 
       # Upload test report
       - name: Upload test report
