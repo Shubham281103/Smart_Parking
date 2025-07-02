@@ -102,7 +102,7 @@ jobs:
       # Create and start emulator
       - name: Create and start emulator
         run: |
-          avdmanager create avd -n $EMULATOR_NAME -k 'system-images;android-30;google_apis;x86_64' --force
+          echo "no" | avdmanager create avd -n $EMULATOR_NAME -k 'system-images;android-30;google_apis;x86_64' --force
           nohup $ANDROID_HOME/emulator/emulator -avd $EMULATOR_NAME -no-window -no-audio -no-boot-anim -gpu swiftshader_indirect &
           $ANDROID_HOME/platform-tools/adb wait-for-device
           $ANDROID_HOME/platform-tools/adb shell 'while [[ -z $(getprop sys.boot_completed) ]]; do sleep 1; done;'
