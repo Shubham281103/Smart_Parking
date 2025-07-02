@@ -80,6 +80,11 @@ jobs:
         run: docker-compose exec -T app flask db init || true
         working-directory: ./Backend
 
+      # Stamp existing database state as up-to-date
+      - name: Stamp existing database state as up-to-date
+        run: docker-compose exec -T app flask db stamp head
+        working-directory: ./Backend
+
       - name: Generate migration scripts
         run: docker-compose exec -T app flask db migrate -m "Initial migration"
         working-directory: ./Backend
