@@ -113,6 +113,10 @@ jobs:
         # Overwriting with `>` is fine if `local.properties` is generated.
         # If it's meant to append, use `>>`.
 
+      # Make gradlew executable (required for Linux CI)
+      - name: Make gradlew executable
+        run: chmod +x Vision-Parking/gradlew
+
       # Run E2E tests on emulator (Minimal, stable configuration for CI)
       - name: Run E2E tests on emulator
         uses: ReactiveCircus/android-emulator-runner@v2
