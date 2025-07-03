@@ -59,7 +59,7 @@ ${ANDROID_SDK_ROOT}/platform-tools/adb start-server
 
 echo "Installing app-debug.apk..."
 start=$(date +%s)
-timeout 120 ${ANDROID_SDK_ROOT}/platform-tools/adb install -r app/build/outputs/apk/debug/app-debug.apk
+timeout 300 ${ANDROID_SDK_ROOT}/platform-tools/adb install -r app/build/outputs/apk/debug/app-debug.apk
 status=$?
 end=$(date +%s)
 echo "APK install took $((end - start)) seconds"
