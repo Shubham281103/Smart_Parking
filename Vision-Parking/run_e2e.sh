@@ -1,81 +1,166 @@
-#!/bin/bash
-set -e
+name: Android E2E Tests with Backend
 
-cd "$(dirname "$0")"
+on:
+  push:
+    branches:
+      - main
+      - master
+  pull_request:
+    branches:
+      - main
+      - master
+  workflow_dispatch: # Allows manual trigger of the workflow
 
-chmod +x gradlew
+jobs:
+  e2e-tests:
+    runs-on: ubuntu-latest # Standard runner for most GitHub Actions workflows
+    env:
+      # Centralize environment variables for easier modification
+      ANDROID_SDK_ROOT: ${{ github.workspace }}/.android/sdk # Recommended path for SDK, relative to workspace
+      API_LEVEL: 28 # Use API 28 for improved emulator stability in CI
+      EMULATOR_NAME: test-emulator
+      PYTHON_VERSION: '3.12' # Specify Python version here
+      JAVA_VERSION: 17 # Specify Java version here
+      APPIUM_LOG_FILE: appium.log # Define Appium log file name
+      TEST_REPORT_FILE: Vision-Parking/tests/report.html # Define test report file path
 
-echo "Assembling debug APK..."
-./gradlew assembleDebug -p app
+    steps:
+      # Checkout code (Always the first step)
+      - name: Checkout code
+        uses: actions/checkout@v4
 
-echo "Waiting for Android device..."
-${ANDROID_SDK_ROOT}/platform-tools/adb wait-for-device
+      # Set up JDK (Prefer specific version and distribution)
+      - name: Set up JDK ${{ env.JAVA_VERSION }}
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin' # Recommended open-source distribution
+          java-version: ${{ env.JAVA_VERSION }}
+          cache: 'gradle' # Cache Gradle dependencies for faster builds
 
-echo "Polling for emulator boot completion..."
-for i in $(seq 1 30); do
-  BOOT_STATUS=$(${ANDROID_SDK_ROOT}/platform-tools/adb shell getprop sys.boot_completed | tr -d '\r')
-  if [[ "$BOOT_STATUS" == "1" ]]; then
-    echo "✅ Emulator boot completed"
-    break
-  fi
-  echo "⏳ Waiting for emulator to boot ($i/30)..."
-  sleep 5
-done
-if [[ "$BOOT_STATUS" != "1" ]]; then
-  echo "❌ Emulator did not boot in time."
-  exit 1
-fi
+      # Set up Python (Use environment variable for version)
+      - name: Set up Python ${{ env.PYTHON_VERSION }}
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+          cache: 'pip' # Cache pip dependencies
 
-echo "Waiting for package manager service..."
-for i in $(seq 1 30); do
-  if ${ANDROID_SDK_ROOT}/platform-tools/adb shell service check package | grep -q "found"; then
-    echo "✅ Package manager service is available"
-    break
-  fi
-  echo "⏳ Waiting for package manager service ($i/30)..."
-  sleep 5
-done
+      # Install Python dependencies
+      - name: Install Python dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r Vision-Parking/tests/requirements.txt
 
-echo "=== ADB devices before install ==="
-${ANDROID_SDK_ROOT}/platform-tools/adb devices
+      # Set up Android SDK (Specify packages clearly)
+      - name: Set up Android SDK
+        uses: android-actions/setup-android@v3
+        with:
+          packages: platform-tools system-images;android-${{ env.API_LEVEL }};google_apis;x86_64 build-tools;28.0.3
+          android-sdk-path: ${{ env.ANDROID_SDK_ROOT }}
 
-echo "=== ADB shell getprop before install ==="
-${ANDROID_SDK_ROOT}/platform-tools/adb shell getprop
+      # Docker Compose Cleanup (Ensure it's always run, even on failure)
+      - name: Clean up Docker Compose (remove old containers and volumes)
+        run: docker compose down -v # Use `docker compose` (v2 syntax)
+        working-directory: ./Backend
+        if: always() # Run this step even if previous steps failed
 
-echo "=== ADB shell df -h before install ==="
-${ANDROID_SDK_ROOT}/platform-tools/adb shell df -h
+      # Start backend with Docker Compose
+      - name: Start backend with Docker Compose
+        run: docker compose up -d # Use `docker compose` (v2 syntax)
+        working-directory: ./Backend
 
-echo "Disabling animations for faster tests..."
-${ANDROID_SDK_ROOT}/platform-tools/adb shell settings put global window_animation_scale 0.0 || echo "⚠️ Failed to set window animation scale"
-${ANDROID_SDK_ROOT}/platform-tools/adb shell settings put global transition_animation_scale 0.0 || echo "⚠️ Failed to set transition animation scale"
-${ANDROID_SDK_ROOT}/platform-tools/adb shell settings put global animator_duration_scale 0.0 || echo "⚠️ Failed to set animator duration scale"
+      # Wait for backend to be ready (Improved robustness with curl retry and timeout)
+      - name: Wait for backend to be ready
+        run: |
+          # Loop with timeout for backend health check
+          for i in $(seq 1 30); do # Use seq for better loop clarity
+            if curl -s http://localhost:5000/health; then
+              echo "Backend is up!"
+              exit 0
+            fi
+            echo "Waiting for backend ($i/30)..."
+            sleep 5
+          done
+          echo "Backend did not start in time after 150 seconds." # More descriptive error
+          exit 1
+        working-directory: ./Backend
 
-# Restart adb server before install
-${ANDROID_SDK_ROOT}/platform-tools/adb kill-server
-${ANDROID_SDK_ROOT}/platform-tools/adb start-server
+      # --- Database migration steps --- (Use separate, well-named steps)
+      - name: Initialize DB migration environment
+        run: docker compose exec -T app flask db init || true # Use `docker compose`
+        working-directory: ./Backend
 
-echo "Installing app-debug.apk..."
-start=$(date +%s)
-timeout 120 ${ANDROID_SDK_ROOT}/platform-tools/adb install -r app/build/outputs/apk/debug/app-debug.apk
-status=$?
-end=$(date +%s)
-echo "APK install took $((end - start)) seconds"
-echo "=== Last 100 lines of logcat after install ==="
-${ANDROID_SDK_ROOT}/platform-tools/adb logcat -d | tail -n 100
-if [ $status -ne 0 ]; then
-  echo "APK install failed or timed out"
-  exit 1
-fi
+      - name: Stamp existing database state as up-to-date
+        run: docker compose exec -T app flask db stamp head # Use `docker compose`
+        working-directory: ./Backend
 
-echo "Installing Appium globally..."
-npm install -g appium
+      - name: Generate migration scripts
+        # Ensure your backend 'app' service has correct Flask context/env set up for migrations
+        run: docker compose exec -T app flask db migrate -m "Initial migration" # Use `docker compose`
+        working-directory: ./Backend
 
-echo "Installing Appium UiAutomator2 driver..."
-appium driver install uiautomator2
+      - name: Apply migrations to database
+        run: docker compose exec -T app flask db upgrade # Use `docker compose`
+        working-directory: ./Backend
 
-echo "Starting Appium server in background..."
-nohup appium --base-path /wd/hub --log "$APPIUM_LOG_FILE" &
-sleep 15
+      # Debug Android cmdline-tools (Good for debugging, keep it for now)
+      - name: Debug Android cmdline-tools
+        run: ls -l ${{ env.ANDROID_SDK_ROOT }}/cmdline-tools
 
-echo "Running pytest E2E tests..."
-pytest --maxfail=1 --disable-warnings --html="$TEST_REPORT_FILE" --self-contained-html 
+      # Inject Google Maps API Key (Using `env` for secrets is generally safer)
+      - name: Inject Google Maps API Key
+        run: echo "MAPS_API_KEY=${{ secrets.MAPS_API_KEY }}" > Vision-Parking/local.properties
+        # Ensure this file is created correctly and read by your Android app build system.
+        # Overwriting with `>` is fine if `local.properties` is generated.
+        # If it's meant to append, use `>>`.
+
+      # Debug: List Vision-Parking directory contents
+      - name: List Vision-Parking directory contents
+        run: ls -l Vision-Parking
+
+      # Make gradlew executable (required for Linux CI)
+      - name: Make gradlew executable
+        run: chmod +x Vision-Parking/gradlew
+
+      # Make run_e2e.sh executable (required for Linux CI)
+      - name: Make run_e2e.sh executable
+        run: chmod +x Vision-Parking/run_e2e.sh
+
+      # Run E2E tests on emulator using shell script
+      - name: Run E2E tests on emulator
+        uses: ReactiveCircus/android-emulator-runner@v2
+        with:
+          api-level: ${{ env.API_LEVEL }}
+          target: google_apis
+          arch: x86_64
+          profile: Nexus 5
+          emulator-options: -no-window -no-audio -no-boot-anim -no-snapshot -memory 2048 -wipe-data
+          script: |
+            ./Vision-Parking/run_e2e.sh
+
+      # Upload test report (Use defined env var for path)
+      - name: Upload test report
+        uses: actions/upload-artifact@v4
+        with:
+          name: e2e-test-report
+          path: ${{ env.TEST_REPORT_FILE }}
+        if: always() # Upload reports even if tests fail
+
+      # Upload Appium log (Use defined env var for path)
+      - name: Upload Appium log
+        uses: actions/upload-artifact@v4
+        with:
+          name: appium-log
+          path: ${{ env.APPIUM_LOG_FILE }}
+        if: always() # Upload logs even if tests fail
+
+      # Upload logcat output for debugging
+      - name: Upload logcat output
+        uses: actions/upload-artifact@v4
+        with:
+          name: logcat-output
+          path: /tmp/logcat.txt
+        if: always()
+
+      # Stop Docker Compose (Crucial for clean up and resource management)
+      - name: Stop Docker Compose Backend
+        run: docker compose down -v # Use `docker compose`
