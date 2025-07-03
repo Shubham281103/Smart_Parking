@@ -17,7 +17,7 @@ jobs:
     env:
       # Centralize environment variables for easier modification
       ANDROID_SDK_ROOT: ${{ github.workspace }}/.android/sdk # Recommended path for SDK, relative to workspace
-      API_LEVEL: 29 # Use API 29 for maximum emulator stability in CI
+      API_LEVEL: 28 # Use API 28 for improved emulator stability in CI
       EMULATOR_NAME: test-emulator
       PYTHON_VERSION: '3.12' # Specify Python version here
       JAVA_VERSION: 17 # Specify Java version here
@@ -54,7 +54,7 @@ jobs:
       - name: Set up Android SDK
         uses: android-actions/setup-android@v3
         with:
-          packages: platform-tools system-images;android-${{ env.API_LEVEL }};google_apis;x86_64 build-tools;29.0.3
+          packages: platform-tools system-images;android-${{ env.API_LEVEL }};google_apis;x86_64 build-tools;28.0.3
           android-sdk-path: ${{ env.ANDROID_SDK_ROOT }}
 
       # Docker Compose Cleanup (Ensure it's always run, even on failure)
