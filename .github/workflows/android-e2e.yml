@@ -58,10 +58,13 @@ jobs:
           android-sdk-path: ${{ env.ANDROID_SDK_ROOT }}
 
       # Cache Android AVD system images
-      - name: Cache Android AVD system images
+      - name: Cache Android AVD
         uses: actions/cache@v3
         with:
-          path: ~/.android/avd
+          path: |
+            ~/.android/avd
+            ~/.android/adb*
+            ~/.android/avd/*.ini
           key: avd-${{ env.API_LEVEL }}-google_apis-x86_64
           restore-keys: |
             avd-${{ env.API_LEVEL }}-google_apis-x86_64
@@ -133,6 +136,23 @@ jobs:
       # Make run_e2e.sh executable (required for Linux CI)
       - name: Make run_e2e.sh executable
         run: chmod +x Vision-Parking/run_e2e.sh
+
+      # Enable KVM for hardware acceleration (harmless if not available)
+      - name: Enable KVM for hardware acceleration
+        run: |
+          echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
+          sudo udevadm control --reload-rules
+          sudo udevadm trigger --name-match=kvm
+
+      # Debug: Check KVM device status
+      - name: Check KVM device
+        run: |
+          if [ -e /dev/kvm ]; then
+            echo "/dev/kvm exists"
+            ls -l /dev/kvm
+          else
+            echo "/dev/kvm does not exist"
+          fi
 
       # Run E2E tests on emulator using shell script
       - name: Run E2E tests on emulator
