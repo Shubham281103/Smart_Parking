@@ -84,10 +84,16 @@ echo "Starting Appium server in background..."
 nohup appium --base-path /wd/hub --log "$APPIUM_LOG_FILE" &
 sleep 15
 
+export TEST_REPORT_FILE=tests/report.html
+
+cd Vision-Parking || { echo "Failed to change directory to Vision-Parking"; exit 1; }
+
 echo "Running pytest E2E tests..."
-pytest --maxfail=1 --disable-warnings --html="$TEST_REPORT_FILE" --self-contained-html 
+pytest --maxfail=1 --disable-warnings --html="$TEST_REPORT_FILE" --self-contained-html
 
 echo "Killing background processes..."
 pkill -f appium || true
 pkill -f emulator || true
-pkill -f adb || true 
+pkill -f adb || true
+
+exit 0 
