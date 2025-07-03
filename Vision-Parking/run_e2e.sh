@@ -86,3 +86,8 @@ sleep 15
 
 echo "Running pytest E2E tests..."
 pytest --maxfail=1 --disable-warnings --html="$TEST_REPORT_FILE" --self-contained-html 
+
+echo "Killing background processes..."
+pkill -f appium || true
+pkill -f emulator || true
+pkill -f adb || true 
