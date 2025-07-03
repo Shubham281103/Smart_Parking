@@ -135,3 +135,6 @@ else
   echo "⚠️ Appium log not found!"
   touch "$APPIUM_LOG_FILE"  # Prevent upload failure
 fi
+
+echo "✅ E2E script completed successfully."
+exit 0
