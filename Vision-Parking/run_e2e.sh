@@ -51,7 +51,7 @@ echo "Installing Appium UiAutomator2 driver..."
 appium driver install uiautomator2
 
 echo "Starting Appium server in background..."
-nohup appium --log "$APPIUM_LOG_FILE" &
+nohup appium --base-path /wd/hub --log "$APPIUM_LOG_FILE" &
 sleep 15
 
 echo "Running pytest E2E tests..."
