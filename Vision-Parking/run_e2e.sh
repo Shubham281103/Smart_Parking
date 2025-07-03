@@ -129,7 +129,7 @@ else
 fi
 
 echo "Waiting for Appium to flush logs..."
-sleep 5
+sleep 60
 
 echo "Stopping Appium (PID=$APPIUM_PID)..."
 kill $APPIUM_PID || true
