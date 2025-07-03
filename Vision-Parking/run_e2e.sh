@@ -1,7 +1,10 @@
 #!/bin/bash
 set -e
 
-# Function to always save logcat to /tmp/logcat.txt on exit, even if the script fails
+# === Global config ===
+export APPIUM_LOG_FILE="/tmp/appium.log"
+
+# Function to always save logcat on exit, even if the script fails
 cleanup_logcat() {
   ${ANDROID_SDK_ROOT}/platform-tools/adb logcat -d > /tmp/logcat.txt 2>&1 || touch /tmp/logcat.txt
 }
@@ -42,19 +45,11 @@ for i in $(seq 1 30); do
   sleep 5
 done
 
-echo "=== ADB devices before install ==="
+echo "=== ADB diagnostics ==="
 ${ANDROID_SDK_ROOT}/platform-tools/adb devices
-
-echo "=== ADB shell getprop before install ==="
 ${ANDROID_SDK_ROOT}/platform-tools/adb shell getprop
-
-echo "=== ADB shell df -h before install ==="
 ${ANDROID_SDK_ROOT}/platform-tools/adb shell df -h
-
-echo "=== ADB shell uptime before install ==="
 ${ANDROID_SDK_ROOT}/platform-tools/adb shell uptime
-
-echo "=== ADB shell top -n 1 before install ==="
 ${ANDROID_SDK_ROOT}/platform-tools/adb shell top -n 1
 
 echo "Sleeping 10 seconds before install..."
@@ -91,13 +86,13 @@ APPIUM_PID=$!
 echo "Waiting for Appium server to be ready..."
 for i in {1..30}; do
   if nc -z 127.0.0.1 4723; then
-    echo "Appium is up!"
+    echo "✅ Appium is up!"
     break
   fi
   sleep 1
 done
 
-# Optionally, fail if Appium never started
+# Fail if Appium never started
 if ! nc -z 127.0.0.1 4723; then
   echo "❌ Appium did not start in time!"
   exit 1
@@ -112,9 +107,15 @@ export TEST_REPORT_FILE=tests/report.html
 
 echo "Running pytest E2E tests..."
 pytest -q --disable-warnings --html="$TEST_REPORT_FILE" --self-contained-html
+PYTEST_EXIT=$?
+
 if [ ! -f "$TEST_REPORT_FILE" ]; then
   echo "❌ Test report not generated, marking as failed."
   exit 1
+fi
+
+if [ $PYTEST_EXIT -ne 0 ]; then
+  echo "⚠️ Pytest exited with code $PYTEST_EXIT — likely due to warnings or skipped tests."
 fi
 
 echo "Waiting for Appium to flush logs..."
@@ -126,14 +127,14 @@ wait $APPIUM_PID 2>/dev/null || true
 
 echo "Killing emulator and adb..."
 pkill -f emulator || true
-pkill -f adb || true
+$ANDROID_SDK_ROOT/platform-tools/adb kill-server || true
 
 # Final log check
-if [ -f "$APPIUM_LOG_FILE" ]; then
+if [ -n "$APPIUM_LOG_FILE" ] && [ -f "$APPIUM_LOG_FILE" ]; then
   echo "✅ Appium log exists: $APPIUM_LOG_FILE"
 else
   echo "⚠️ Appium log not found!"
-  touch "$APPIUM_LOG_FILE"  # Prevent upload failure
+  touch "$APPIUM_LOG_FILE"
 fi
 
 echo "✅ E2E script completed successfully."
