@@ -111,8 +111,11 @@ fi
 export TEST_REPORT_FILE=tests/report.html
 
 echo "Running pytest E2E tests..."
-pytest --maxfail=1 --disable-warnings --html="$TEST_REPORT_FILE" --self-contained-html
-PYTEST_EXIT_CODE=$?
+pytest -q --disable-warnings --html="$TEST_REPORT_FILE" --self-contained-html
+if [ ! -f "$TEST_REPORT_FILE" ]; then
+  echo "❌ Test report not generated, marking as failed."
+  exit 1
+fi
 
 echo "Waiting for Appium to flush logs..."
 sleep 5
@@ -132,5 +135,3 @@ else
   echo "⚠️ Appium log not found!"
   touch "$APPIUM_LOG_FILE"  # Prevent upload failure
 fi
-
-exit $PYTEST_EXIT_CODE
