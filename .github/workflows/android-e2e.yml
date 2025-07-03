@@ -134,7 +134,7 @@ jobs:
             cd Vision-Parking || { echo "Failed to change directory to Vision-Parking"; exit 1; }
 
             echo "Assembling debug APK..."
-            ./gradlew assembleDebug -p app || { echo "Gradle build failed"; exit 1; }
+            ./gradlew assembleDebug || { echo "Gradle build failed"; exit 1; }
 
             echo "Waiting for Android device..."
             ${ANDROID_SDK_ROOT}/platform-tools/adb wait-for-device
