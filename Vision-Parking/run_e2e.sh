@@ -48,25 +48,29 @@ ${ANDROID_SDK_ROOT}/platform-tools/adb shell getprop
 echo "=== ADB shell df -h before install ==="
 ${ANDROID_SDK_ROOT}/platform-tools/adb shell df -h
 
-echo "Disabling animations for faster tests..."
-${ANDROID_SDK_ROOT}/platform-tools/adb shell settings put global window_animation_scale 0.0 || echo "⚠️ Failed to set window animation scale"
-${ANDROID_SDK_ROOT}/platform-tools/adb shell settings put global transition_animation_scale 0.0 || echo "⚠️ Failed to set transition animation scale"
-${ANDROID_SDK_ROOT}/platform-tools/adb shell settings put global animator_duration_scale 0.0 || echo "⚠️ Failed to set animator duration scale"
+echo "=== ADB shell uptime before install ==="
+${ANDROID_SDK_ROOT}/platform-tools/adb shell uptime
 
-# Restart adb server before install
-${ANDROID_SDK_ROOT}/platform-tools/adb kill-server
-${ANDROID_SDK_ROOT}/platform-tools/adb start-server
+echo "=== ADB shell top -n 1 before install ==="
+${ANDROID_SDK_ROOT}/platform-tools/adb shell top -n 1
 
-echo "Installing app-debug.apk..."
-start=$(date +%s)
-timeout 300 ${ANDROID_SDK_ROOT}/platform-tools/adb install -r app/build/outputs/apk/debug/app-debug.apk
-status=$?
-end=$(date +%s)
-echo "APK install took $((end - start)) seconds"
-echo "=== Last 100 lines of logcat after install ==="
-${ANDROID_SDK_ROOT}/platform-tools/adb logcat -d | tail -n 100
-if [ $status -ne 0 ]; then
-  echo "APK install failed or timed out"
+echo "Sleeping 10 seconds before install..."
+sleep 10
+
+echo "Installing app-debug.apk with retries..."
+INSTALL_SUCCESS=0
+for i in $(seq 1 5); do
+  if ${ANDROID_SDK_ROOT}/platform-tools/adb install -r app/build/outputs/apk/debug/app-debug.apk; then
+    INSTALL_SUCCESS=1
+    echo "✅ APK installed successfully on attempt $i"
+    break
+  else
+    echo "❌ APK install failed on attempt $i, retrying in 30s..."
+    sleep 30
+  fi
+done
+if [ $INSTALL_SUCCESS -ne 1 ]; then
+  echo "APK install failed after 5 attempts"
   exit 1
 fi
 
