@@ -47,6 +47,9 @@ ${ANDROID_SDK_ROOT}/platform-tools/adb install -r app/build/outputs/apk/debug/ap
 echo "Installing Appium globally..."
 npm install -g appium
 
+echo "Installing Appium UiAutomator2 driver..."
+appium driver install uiautomator2
+
 echo "Starting Appium server in background..."
 nohup appium --log "$APPIUM_LOG_FILE" &
 sleep 15
