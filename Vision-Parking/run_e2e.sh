@@ -26,12 +26,15 @@ if [[ "$BOOT_STATUS" != "1" ]]; then
   exit 1
 fi
 
-echo "Attempting adb root..."
-${ANDROID_SDK_ROOT}/platform-tools/adb root || echo "⚠️ adb root failed (may not be necessary)"
-sleep 2
-
-echo "Attempting adb remount..."
-${ANDROID_SDK_ROOT}/platform-tools/adb remount || echo "⚠️ adb remount failed (may not be necessary)"
+echo "Waiting for package manager service..."
+for i in $(seq 1 30); do
+  if ${ANDROID_SDK_ROOT}/platform-tools/adb shell service check package | grep -q "found"; then
+    echo "✅ Package manager service is available"
+    break
+  fi
+  echo "⏳ Waiting for package manager service ($i/30)..."
+  sleep 5
+done
 
 echo "Disabling animations for faster tests..."
 ${ANDROID_SDK_ROOT}/platform-tools/adb shell settings put global window_animation_scale 0.0 || echo "⚠️ Failed to set window animation scale"
