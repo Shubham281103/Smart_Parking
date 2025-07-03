@@ -86,7 +86,10 @@ sleep 15
 
 export TEST_REPORT_FILE=tests/report.html
 
-cd Vision-Parking || { echo "Failed to change directory to Vision-Parking"; exit 1; }
+# Only cd into Vision-Parking if not already there
+if [ "$(basename "$PWD")" != "Vision-Parking" ]; then
+  cd Vision-Parking || { echo "Failed to change directory to Vision-Parking"; exit 1; }
+fi
 
 echo "Running pytest E2E tests..."
 pytest --maxfail=1 --disable-warnings --html="$TEST_REPORT_FILE" --self-contained-html
