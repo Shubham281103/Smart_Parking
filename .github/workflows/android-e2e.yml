@@ -153,6 +153,14 @@ jobs:
           path: ${{ env.APPIUM_LOG_FILE }}
         if: always() # Upload logs even if tests fail
 
+      # Upload logcat output for debugging
+      - name: Upload logcat output
+        uses: actions/upload-artifact@v4
+        with:
+          name: logcat-output
+          path: /tmp/logcat.txt
+        if: always()
+
       # Stop Docker Compose (Crucial for clean up and resource management)
       - name: Stop Docker Compose Backend
         run: docker compose down -v # Use `docker compose`
