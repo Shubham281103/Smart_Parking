@@ -87,6 +87,22 @@ echo "Starting Appium server in background..."
 nohup appium --base-path /wd/hub --log "$APPIUM_LOG_FILE" &
 APPIUM_PID=$!
 
+# Wait for Appium to be ready
+echo "Waiting for Appium server to be ready..."
+for i in {1..30}; do
+  if nc -z 127.0.0.1 4723; then
+    echo "Appium is up!"
+    break
+  fi
+  sleep 1
+done
+
+# Optionally, fail if Appium never started
+if ! nc -z 127.0.0.1 4723; then
+  echo "❌ Appium did not start in time!"
+  exit 1
+fi
+
 # Only cd into Vision-Parking if not already there
 if [ "$(basename "$PWD")" != "Vision-Parking" ]; then
   cd Vision-Parking || { echo "Failed to change directory to Vision-Parking"; exit 1; }
