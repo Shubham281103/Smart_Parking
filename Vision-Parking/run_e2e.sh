@@ -41,8 +41,21 @@ ${ANDROID_SDK_ROOT}/platform-tools/adb shell settings put global window_animatio
 ${ANDROID_SDK_ROOT}/platform-tools/adb shell settings put global transition_animation_scale 0.0 || echo "⚠️ Failed to set transition animation scale"
 ${ANDROID_SDK_ROOT}/platform-tools/adb shell settings put global animator_duration_scale 0.0 || echo "⚠️ Failed to set animator duration scale"
 
+# Restart adb server before install
+${ANDROID_SDK_ROOT}/platform-tools/adb kill-server
+${ANDROID_SDK_ROOT}/platform-tools/adb start-server
+
 echo "Installing app-debug.apk..."
-${ANDROID_SDK_ROOT}/platform-tools/adb install -r app/build/outputs/apk/debug/app-debug.apk
+start=$(date +%s)
+timeout 120 ${ANDROID_SDK_ROOT}/platform-tools/adb install -r app/build/outputs/apk/debug/app-debug.apk
+status=$?
+end=$(date +%s)
+echo "APK install took $((end - start)) seconds"
+if [ $status -ne 0 ]; then
+  echo "APK install failed or timed out"
+  ${ANDROID_SDK_ROOT}/platform-tools/adb logcat -d | tail -n 100
+  exit 1
+fi
 
 echo "Installing Appium globally..."
 npm install -g appium
