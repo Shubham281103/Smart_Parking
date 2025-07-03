@@ -2,7 +2,8 @@
 set -e
 
 # === Global config ===
-export APPIUM_LOG_FILE="/tmp/appium.log"
+# Ensure APPIUM_LOG_FILE is always an absolute path
+export APPIUM_LOG_FILE="/tmp/appium.log" # Or use the one passed from the environment if available
 
 # Function to always save logcat on exit, even if the script fails
 cleanup_logcat() {
@@ -78,13 +79,17 @@ npm install -g appium
 echo "Installing Appium UiAutomator2 driver..."
 appium driver install uiautomator2
 
+# Add Appium version check for debugging
+echo "Appium version:"
+appium -v
+
 echo "Starting Appium server in background..."
 nohup appium --base-path /wd/hub --log "$APPIUM_LOG_FILE" &
 APPIUM_PID=$!
 
-# Wait for Appium to be ready
+# Wait for Appium to be ready (increase loop to 60 seconds for robustness if needed)
 echo "Waiting for Appium server to be ready..."
-for i in {1..30}; do
+for i in {1..60}; do # Increased wait time
   if nc -z 127.0.0.1 4723; then
     echo "✅ Appium is up!"
     break
@@ -94,7 +99,8 @@ done
 
 # Fail if Appium never started
 if ! nc -z 127.0.0.1 4723; then
-  echo "❌ Appium did not start in time!"
+  echo "❌ Appium did not start in time! Checking appium log for details..."
+  cat "$APPIUM_LOG_FILE" # Print Appium log to console for immediate debugging
   exit 1
 fi
 
@@ -103,7 +109,7 @@ if [ "$(basename "$PWD")" != "Vision-Parking" ]; then
   cd Vision-Parking || { echo "Failed to change directory to Vision-Parking"; exit 1; }
 fi
 
-export TEST_REPORT_FILE=tests/report.html
+export TEST_REPORT_FILE=tests/report.html # Ensure this matches the YML if you're passing it
 
 echo "Running pytest E2E tests..."
 pytest -q --disable-warnings --html="$TEST_REPORT_FILE" --self-contained-html
@@ -114,8 +120,12 @@ if [ ! -f "$TEST_REPORT_FILE" ]; then
   exit 1
 fi
 
+# Crucial change: Exit with the pytest exit code
 if [ $PYTEST_EXIT -ne 0 ]; then
-  echo "⚠️ Pytest exited with code $PYTEST_EXIT — likely due to warnings or skipped tests."
+  echo "❌ Pytest exited with code $PYTEST_EXIT. This indicates test failures or errors."
+  exit $PYTEST_EXIT
+else
+  echo "✅ All Pytest E2E tests passed."
 fi
 
 echo "Waiting for Appium to flush logs..."
