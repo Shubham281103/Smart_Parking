@@ -1,8 +1,11 @@
 #!/bin/bash
 set -e
 
-# Always save logcat to /tmp/logcat.txt on exit, even if the script fails
-trap '${ANDROID_SDK_ROOT}/platform-tools/adb logcat -d > /tmp/logcat.txt 2>&1 || touch /tmp/logcat.txt' EXIT
+# Function to always save logcat to /tmp/logcat.txt on exit, even if the script fails
+cleanup_logcat() {
+  ${ANDROID_SDK_ROOT}/platform-tools/adb logcat -d > /tmp/logcat.txt 2>&1 || touch /tmp/logcat.txt
+}
+trap cleanup_logcat EXIT
 
 cd "$(dirname "$0")"
 
@@ -84,12 +87,12 @@ echo "Starting Appium server in background..."
 nohup appium --base-path /wd/hub --log "$APPIUM_LOG_FILE" &
 sleep 15
 
-export TEST_REPORT_FILE=tests/report.html
-
 # Only cd into Vision-Parking if not already there
 if [ "$(basename "$PWD")" != "Vision-Parking" ]; then
   cd Vision-Parking || { echo "Failed to change directory to Vision-Parking"; exit 1; }
 fi
+
+export TEST_REPORT_FILE=tests/report.html
 
 echo "Running pytest E2E tests..."
 pytest --maxfail=1 --disable-warnings --html="$TEST_REPORT_FILE" --self-contained-html
