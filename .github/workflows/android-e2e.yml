@@ -121,6 +121,10 @@ jobs:
       - name: Make gradlew executable
         run: chmod +x Vision-Parking/gradlew
 
+      # Make run_e2e.sh executable (required for Linux CI)
+      - name: Make run_e2e.sh executable
+        run: chmod +x Vision-Parking/run_e2e.sh
+
       # Run E2E tests on emulator using shell script
       - name: Run E2E tests on emulator
         uses: ReactiveCircus/android-emulator-runner@v2
