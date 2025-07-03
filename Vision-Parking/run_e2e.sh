@@ -85,7 +85,7 @@ appium driver install uiautomator2
 
 echo "Starting Appium server in background..."
 nohup appium --base-path /wd/hub --log "$APPIUM_LOG_FILE" &
-sleep 15
+APPIUM_PID=$!
 
 # Only cd into Vision-Parking if not already there
 if [ "$(basename "$PWD")" != "Vision-Parking" ]; then
@@ -96,10 +96,25 @@ export TEST_REPORT_FILE=tests/report.html
 
 echo "Running pytest E2E tests..."
 pytest --maxfail=1 --disable-warnings --html="$TEST_REPORT_FILE" --self-contained-html
+PYTEST_EXIT_CODE=$?
 
-echo "Killing background processes..."
-pkill -f appium || true
+echo "Waiting for Appium to flush logs..."
+sleep 5
+
+echo "Stopping Appium (PID=$APPIUM_PID)..."
+kill $APPIUM_PID || true
+wait $APPIUM_PID 2>/dev/null || true
+
+echo "Killing emulator and adb..."
 pkill -f emulator || true
 pkill -f adb || true
 
-exit 0 
+# Final log check
+if [ -f "$APPIUM_LOG_FILE" ]; then
+  echo "✅ Appium log exists: $APPIUM_LOG_FILE"
+else
+  echo "⚠️ Appium log not found!"
+  touch "$APPIUM_LOG_FILE"  # Prevent upload failure
+fi
+
+exit $PYTEST_EXIT_CODE
