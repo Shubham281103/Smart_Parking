@@ -36,6 +36,15 @@ for i in $(seq 1 30); do
   sleep 5
 done
 
+echo "=== ADB devices before install ==="
+${ANDROID_SDK_ROOT}/platform-tools/adb devices
+
+echo "=== ADB shell getprop before install ==="
+${ANDROID_SDK_ROOT}/platform-tools/adb shell getprop
+
+echo "=== ADB shell df -h before install ==="
+${ANDROID_SDK_ROOT}/platform-tools/adb shell df -h
+
 echo "Disabling animations for faster tests..."
 ${ANDROID_SDK_ROOT}/platform-tools/adb shell settings put global window_animation_scale 0.0 || echo "⚠️ Failed to set window animation scale"
 ${ANDROID_SDK_ROOT}/platform-tools/adb shell settings put global transition_animation_scale 0.0 || echo "⚠️ Failed to set transition animation scale"
@@ -51,9 +60,10 @@ timeout 120 ${ANDROID_SDK_ROOT}/platform-tools/adb install -r app/build/outputs/
 status=$?
 end=$(date +%s)
 echo "APK install took $((end - start)) seconds"
+echo "=== Last 100 lines of logcat after install ==="
+${ANDROID_SDK_ROOT}/platform-tools/adb logcat -d | tail -n 100
 if [ $status -ne 0 ]; then
   echo "APK install failed or timed out"
-  ${ANDROID_SDK_ROOT}/platform-tools/adb logcat -d | tail -n 100
   exit 1
 fi
 
