@@ -2,10 +2,8 @@
 set -e
 
 # === Global config ===
-# Ensure APPIUM_LOG_FILE is always an absolute path
-export APPIUM_LOG_FILE="/tmp/appium.log" # Or use the one passed from the environment if available
+export APPIUM_LOG_FILE="/tmp/appium.log"
 
-# Function to always save logcat on exit, even if the script fails
 cleanup_logcat() {
   echo "Capturing final logcat output..."
   ${ANDROID_SDK_ROOT}/platform-tools/adb logcat -d > /tmp/logcat.txt 2>&1 || touch /tmp/logcat.txt
@@ -80,16 +78,13 @@ npm install -g appium
 echo "Installing Appium UiAutomator2 driver..."
 appium driver install uiautomator2
 
-# Add Appium version check for debugging
 echo "Appium version:"
 appium -v
 
-# Start Appium with debug logging
 echo "Starting Appium server in background with debug logging..."
 nohup appium --base-path /wd/hub --log "$APPIUM_LOG_FILE" --log-level debug &
 APPIUM_PID=$!
 
-# Wait for Appium to be ready (increased to 60 seconds)
 echo "Waiting for Appium server to be ready (up to 60s)..."
 for i in {1..60}; do
   if nc -z 127.0.0.1 4723; then
@@ -99,15 +94,13 @@ for i in {1..60}; do
   sleep 1
 done
 
-# Fail if Appium never started
 if ! nc -z 127.0.0.1 4723; then
   echo "❌ Appium did not start in time!"
   echo "Printing Appium log for immediate debugging:"
-  cat "$APPIUM_LOG_FILE" # Print Appium log to console for immediate debugging
+  cat "$APPIUM_LOG_FILE"
   exit 1
 fi
 
-# Only cd into Vision-Parking if not already there
 if [ "$(basename "$PWD")" != "Vision-Parking" ]; then
   cd Vision-Parking || { echo "Failed to change directory to Vision-Parking"; exit 1; }
 fi
@@ -126,13 +119,11 @@ fi
 # New logic: If pytest passed, exit successfully immediately
 if [ $PYTEST_EXIT -eq 0 ]; then
   echo "✅ All Pytest E2E tests passed. Exiting successfully."
-  # Stop Appium and emulator cleanly (optional, but good practice)
+  # Stop Appium cleanly
   echo "Stopping Appium (PID=$APPIUM_PID)..."
   kill $APPIUM_PID || true
   wait $APPIUM_PID 2>/dev/null || true
-  echo "Killing emulator and adb..."
-  pkill -f emulator || true
-  $ANDROID_SDK_ROOT/platform-tools/adb kill-server || true
+  # Do NOT kill emulator or adb here. Let the android-emulator-runner action handle it.
   exit 0
 else
   # If pytest failed, proceed to capture logs for debugging
@@ -144,17 +135,14 @@ else
   echo "Stopping Appium (PID=$APPIUM_PID)..."
   kill $APPIUM_PID || true
   wait $APPIUM_PID 2>/dev/null || true
-
-  echo "Killing emulator and adb..."
-  pkill -f emulator || true
-  $ANDROID_SDK_ROOT/platform-tools/adb kill-server || true
+  # Do NOT kill emulator or adb here. Let the android-emulator-runner action handle it.
 
   # Final log check
   if [ -n "$APPIUM_LOG_FILE" ] && [ -f "$APPIUM_LOG_FILE" ]; then
     echo "✅ Appium log exists: $APPIUM_LOG_FILE"
   else
     echo "⚠️ Appium log not found or empty!"
-    touch "$APPIUM_LOG_FILE" # Ensure it exists for artifact upload
+    touch "$APPIUM_LOG_FILE"
   fi
 
   # Exit with the pytest failure status
