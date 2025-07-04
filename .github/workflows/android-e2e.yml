@@ -191,5 +191,7 @@ jobs:
         if: always()
 
       # Stop Docker Compose (Crucial for clean up and resource management)
-      - name: Stop Docker Compose Backend
-        run: docker compose down -v # Use `docker compose`
+      - name: Clean up Docker Compose (remove old containers and volumes)
+        run: docker compose down -v # Use `docker compose` (v2 syntax)
+        working-directory: ./Backend
+        if: always() # Run this step even if previous steps failed
