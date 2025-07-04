@@ -7,6 +7,7 @@ export APPIUM_LOG_FILE="/tmp/appium.log" # Or use the one passed from the enviro
 
 # Function to always save logcat on exit, even if the script fails
 cleanup_logcat() {
+  echo "Capturing final logcat output..."
   ${ANDROID_SDK_ROOT}/platform-tools/adb logcat -d > /tmp/logcat.txt 2>&1 || touch /tmp/logcat.txt
 }
 trap cleanup_logcat EXIT
@@ -83,13 +84,14 @@ appium driver install uiautomator2
 echo "Appium version:"
 appium -v
 
-echo "Starting Appium server in background..."
-nohup appium --base-path /wd/hub --log "$APPIUM_LOG_FILE" &
+# Start Appium with debug logging
+echo "Starting Appium server in background with debug logging..."
+nohup appium --base-path /wd/hub --log "$APPIUM_LOG_FILE" --log-level debug &
 APPIUM_PID=$!
 
-# Wait for Appium to be ready (increase loop to 60 seconds for robustness if needed)
-echo "Waiting for Appium server to be ready..."
-for i in {1..60}; do # Increased wait time
+# Wait for Appium to be ready (increased to 60 seconds)
+echo "Waiting for Appium server to be ready (up to 60s)..."
+for i in {1..60}; do
   if nc -z 127.0.0.1 4723; then
     echo "✅ Appium is up!"
     break
@@ -99,7 +101,8 @@ done
 
 # Fail if Appium never started
 if ! nc -z 127.0.0.1 4723; then
-  echo "❌ Appium did not start in time! Checking appium log for details..."
+  echo "❌ Appium did not start in time!"
+  echo "Printing Appium log for immediate debugging:"
   cat "$APPIUM_LOG_FILE" # Print Appium log to console for immediate debugging
   exit 1
 fi
@@ -109,7 +112,7 @@ if [ "$(basename "$PWD")" != "Vision-Parking" ]; then
   cd Vision-Parking || { echo "Failed to change directory to Vision-Parking"; exit 1; }
 fi
 
-export TEST_REPORT_FILE=tests/report.html # Ensure this matches the YML if you're passing it
+export TEST_REPORT_FILE=tests/report.html
 
 echo "Running pytest E2E tests..."
 pytest -q --disable-warnings --html="$TEST_REPORT_FILE" --self-contained-html
@@ -120,32 +123,40 @@ if [ ! -f "$TEST_REPORT_FILE" ]; then
   exit 1
 fi
 
-# Crucial change: Exit with the pytest exit code
-if [ $PYTEST_EXIT -ne 0 ]; then
-  echo "❌ Pytest exited with code $PYTEST_EXIT. This indicates test failures or errors."
+# New logic: If pytest passed, exit successfully immediately
+if [ $PYTEST_EXIT -eq 0 ]; then
+  echo "✅ All Pytest E2E tests passed. Exiting successfully."
+  # Stop Appium and emulator cleanly (optional, but good practice)
+  echo "Stopping Appium (PID=$APPIUM_PID)..."
+  kill $APPIUM_PID || true
+  wait $APPIUM_PID 2>/dev/null || true
+  echo "Killing emulator and adb..."
+  pkill -f emulator || true
+  $ANDROID_SDK_ROOT/platform-tools/adb kill-server || true
+  exit 0
+else
+  # If pytest failed, proceed to capture logs for debugging
+  echo "❌ Pytest exited with code $PYTEST_EXIT. This indicates test failures or errors. Collecting logs for debugging."
+  # Add a 1-minute (60-second) delay before killing Appium to ensure logs are flushed
+  echo "Waiting 60 seconds for Appium to flush all logs and complete operations before stopping..."
+  sleep 60
+
+  echo "Stopping Appium (PID=$APPIUM_PID)..."
+  kill $APPIUM_PID || true
+  wait $APPIUM_PID 2>/dev/null || true
+
+  echo "Killing emulator and adb..."
+  pkill -f emulator || true
+  $ANDROID_SDK_ROOT/platform-tools/adb kill-server || true
+
+  # Final log check
+  if [ -n "$APPIUM_LOG_FILE" ] && [ -f "$APPIUM_LOG_FILE" ]; then
+    echo "✅ Appium log exists: $APPIUM_LOG_FILE"
+  else
+    echo "⚠️ Appium log not found or empty!"
+    touch "$APPIUM_LOG_FILE" # Ensure it exists for artifact upload
+  fi
+
+  # Exit with the pytest failure status
   exit $PYTEST_EXIT
-else
-  echo "✅ All Pytest E2E tests passed."
 fi
-
-echo "Waiting for Appium to flush logs..."
-sleep 60
-
-echo "Stopping Appium (PID=$APPIUM_PID)..."
-kill $APPIUM_PID || true
-wait $APPIUM_PID 2>/dev/null || true
-
-echo "Killing emulator and adb..."
-pkill -f emulator || true
-$ANDROID_SDK_ROOT/platform-tools/adb kill-server || true
-
-# Final log check
-if [ -n "$APPIUM_LOG_FILE" ] && [ -f "$APPIUM_LOG_FILE" ]; then
-  echo "✅ Appium log exists: $APPIUM_LOG_FILE"
-else
-  echo "⚠️ Appium log not found!"
-  touch "$APPIUM_LOG_FILE"
-fi
-
-echo "✅ E2E script completed successfully."
-exit 0
